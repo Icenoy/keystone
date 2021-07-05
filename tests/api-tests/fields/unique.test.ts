@@ -73,11 +73,11 @@ testModules
             expectPrismaError(body.errors, [
               {
                 path: ['createTest'],
-                message: expect.stringMatching(
-                  /\nInvalid `prisma\.test\.create\(\)` invocation:\n(.*\n){2}  Unique constraint failed on the fields: \(`testField`\)/
-                ),
-                code: 'P2002',
-                target: ['testField'],
+                error: {
+                  code: 'P2002',
+                  message: 'Unique constraint failed on the fields: (`testField`)',
+                  meta: { target: ['testField'] },
+                },
               },
             ]);
           })
@@ -98,16 +98,14 @@ testModules
                 barData: { testField: mod.exampleValue(matrixValue) },
               },
             });
-
-            expect(body.data).toEqual({ foo: { id: expect.any(String) }, bar: null });
             expectPrismaError(body.errors, [
               {
                 path: ['bar'],
-                message: expect.stringMatching(
-                  /\nInvalid `prisma\.test\.create\(\)` invocation:\n(.*\n){2}  Unique constraint failed on the fields: \(`testField`\)/
-                ),
-                code: 'P2002',
-                target: ['testField'],
+                error: {
+                  code: 'P2002',
+                  message: 'Unique constraint failed on the fields: (`testField`)',
+                  meta: { target: ['testField'] },
+                },
               },
             ]);
           })

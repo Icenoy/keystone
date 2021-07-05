@@ -10,6 +10,9 @@ import {
   KeystoneContext,
   graphql,
 } from '../../../types';
+import { getImageRef, SUPPORTED_IMAGE_EXTENSIONS } from '@keystone-next/utils';
+import { FileUpload } from 'graphql-upload';
+import { userInputError } from '../../../../keystone/src/lib/core/graphql-errors';
 import { resolveView } from '../../resolve-view';
 import { getImageRef, SUPPORTED_IMAGE_EXTENSIONS } from './utils';
 
@@ -79,12 +82,12 @@ async function inputResolver(data: ImageFieldInputType, context: KeystoneContext
 
   if (data.ref) {
     if (data.upload) {
-      throw new Error('Only one of ref and upload can be passed to ImageFieldInput');
+      throw userInputError('Only one of ref and upload can be passed to ImageFieldInput');
     }
     return context.images!.getDataFromRef(data.ref);
   }
   if (!data.upload) {
-    throw new Error('Either ref or upload must be passed to ImageFieldInput');
+    throw userInputError('Either ref or upload must be passed to ImageFieldInput');
   }
   return context.images!.getDataFromStream((await data.upload).createReadStream());
 }

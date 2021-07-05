@@ -9,7 +9,7 @@ import {
   ScalarDBField,
   graphql,
 } from '../types';
-import { packagePath } from '../package-path';
+import { userInputError } from './core/graphql-errors';
 
 const views = path.join(
   packagePath,
@@ -19,13 +19,13 @@ const views = path.join(
 const idParsers = {
   autoincrement(val: string | null) {
     if (val === null) {
-      throw new Error('Only an integer can be passed to id filters');
+      throw userInputError('Only an integer can be passed to id filters');
     }
     const parsed = parseInt(val);
     if (Number.isInteger(parsed)) {
       return parsed;
     }
-    throw new Error('Only an integer can be passed to id filters');
+    throw userInputError('Only an integer can be passed to id filters');
   },
   cuid(val: string | null) {
     // isCuid is just "it's a string and it starts with c"
@@ -33,13 +33,13 @@ const idParsers = {
     if (typeof val === 'string' && isCuid(val)) {
       return val;
     }
-    throw new Error('Only a cuid can be passed to id filters');
+    throw userInputError('Only a cuid can be passed to id filters');
   },
   uuid(val: string | null) {
     if (typeof val === 'string' && validate(val)) {
       return val.toLowerCase();
     }
-    throw new Error('Only a uuid can be passed to id filters');
+    throw userInputError('Only a uuid can be passed to id filters');
   },
 };
 

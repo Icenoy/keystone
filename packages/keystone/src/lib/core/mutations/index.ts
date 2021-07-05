@@ -30,6 +30,7 @@ export function getMutationsForList(list: InitialisedList, provider: DatabasePro
     },
   });
 
+  // FIXME: Should this exist on list.types?
   const createMany = graphql.field({
     type: graphql.list(list.types.output),
     args: {
@@ -55,6 +56,7 @@ export function getMutationsForList(list: InitialisedList, provider: DatabasePro
     },
   });
 
+  // FIXME: Should this exist on list.types?
   const updateManyInput = graphql.inputObject({
     name: names.updateManyInputName,
     fields: {

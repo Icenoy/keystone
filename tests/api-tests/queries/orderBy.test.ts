@@ -259,7 +259,10 @@ describe('Ordering by a single field', () => {
       });
       expect(body.data).toEqual({ users: null });
       expectBadUserInput(body.errors, [
-        { path: ['users'], message: 'Only a single key must be passed to UserOrderByInput' },
+        {
+          path: ['users'],
+          message: 'Input error: Only a single key must be passed to UserOrderByInput',
+        },
       ]);
     })
   );

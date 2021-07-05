@@ -271,6 +271,7 @@ export type UpdateFieldInputArg<
   TArg extends graphql.Arg<graphql.InputType, any>
 > = {
   arg: TArg;
+  validate?: any;
 } & ResolveFunc<
   FieldInputResolver<
     graphql.InferValueFromArg<TArg>,
@@ -306,12 +307,15 @@ export type CreateFieldInputArg<
   ? DBFieldToInputValue<TDBField> extends graphql.InferValueFromArg<TArg>
     ? {
         resolve?: CreateFieldInputResolver<graphql.InferValueFromArg<TArg>, TDBField>;
+        validate?: any;
       }
     : {
         resolve: CreateFieldInputResolver<graphql.InferValueFromArg<TArg>, TDBField>;
+        validate?: any;
       }
   : {
       resolve: CreateFieldInputResolver<undefined, TDBField>;
+      validate?: any;
     });
 
 type UnwrapMaybePromise<T> = T extends Promise<infer Resolved> ? Resolved : T;

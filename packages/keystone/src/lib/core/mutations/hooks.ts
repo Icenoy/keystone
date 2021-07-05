@@ -22,6 +22,7 @@ export async function runSideEffectOnlyHook<
 
   // Only run field hooks on change operations if the field
   // was specified in the original input.
+  // FIXME: Should we make this the resolved data instead?
   let shouldRunFieldLevelHook: (fieldKey: string) => boolean;
   if (hookName === 'beforeChange' || hookName === 'afterChange') {
     const originalInputKeys = new Set(Object.keys(args.originalInput));

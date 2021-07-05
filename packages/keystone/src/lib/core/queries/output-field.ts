@@ -19,7 +19,6 @@ import {
 import { ResolvedDBField, ResolvedRelationDBField } from '../resolve-relationships';
 import { InitialisedList } from '../types-for-lists';
 import { IdType, getDBFieldKeyForFieldOnMultiField, runWithPrisma } from '../utils';
-import { accessControlledFilter } from './resolvers';
 import * as queries from './resolvers';
 
 function getRelationVal(
@@ -42,6 +41,7 @@ function getRelationVal(
         queries.count({ where }, foreignList, context, info, relationFilter),
     };
   } else {
+    // findOne
     return async () => {
       // Check operation permission to pass into single operation
       const operationAccess = await checkOperationAccess(foreignList, context, 'query');
@@ -61,9 +61,8 @@ function getRelationVal(
         accessFilters
       );
 
-      return runWithPrisma(context, foreignList, model =>
-        model.findFirst({ where: resolvedWhere })
-      );
+      // Maybe KS_PRISMA_ERROR
+      return runWithPrisma(context, foreignList, model => model.findFirst({ where: filter }));
     };
   }
 }
@@ -131,6 +130,7 @@ export function outputTypeField(
         info.cacheControl.setCacheHint(cacheHint as any);
       }
 
+      // Any of the errors from findOne/findMany/count
       const value = getValueForDBField(rootVal, dbField, id, fieldKey, context, lists, info);
 
       if (output.resolve) {

@@ -39,8 +39,9 @@ describe('errors on incomplete data', () => {
       expectRelationshipError(errors, [
         {
           path: ['createEvent'],
-          message:
-            "Nested to-one mutations must provide exactly one field if they're provided but Event.group<Group> did not",
+          messages: [
+            'Input error: Relationship field Event.group accepts exactly one input value.',
+          ],
         },
       ]);
     })
@@ -66,8 +67,9 @@ describe('errors on incomplete data', () => {
       expectRelationshipError(errors, [
         {
           path: ['createEvent'],
-          message:
-            "Nested to-one mutations must provide exactly one field if they're provided but Event.group<Group> did not",
+          messages: [
+            'Input error: Relationship field Event.group accepts exactly one input value.',
+          ],
         },
       ]);
     })

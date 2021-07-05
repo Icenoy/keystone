@@ -2,15 +2,14 @@ import pLimit, { Limit } from 'p-limit';
 import { KeystoneContext, DatabaseProvider, ItemRootValue } from '../../../types';
 import { ResolvedDBField } from '../resolve-relationships';
 import { InitialisedList } from '../types-for-lists';
+import { getDBFieldKeyForFieldOnMultiField, IdType, runWithPrisma } from '../utils';
 import {
-  promiseAllRejectWithAllErrors,
-  getDBFieldKeyForFieldOnMultiField,
-  IdType,
-  runWithPrisma,
-} from '../utils';
-import { InputFilter, resolveUniqueWhereInput, UniqueInputFilter } from '../where-inputs';
-import { accessDeniedError, extensionError } from '../graphql-errors';
-import { checkOperationAccess, getAccessFilters } from '../access-control';
+  extensionError,
+  promiseAllRejectWithExtensionError,
+  promiseAllRejectWithRelationshipError,
+  promiseAllRejectWithSystemError,
+} from '../graphql-errors';
+import { resolveUniqueWhereInput, UniqueInputFilter } from '../where-inputs';
 import {
   resolveRelateToManyForCreateInput,
   resolveRelateToManyForUpdateInput,
@@ -34,6 +33,8 @@ async function createSingle(
   if (!operationAccess) {
     throw accessDeniedError();
   }
+
+  // Validate form of input data?
 
   //  Item access control. Will throw an accessDeniedError if not allowed.
   await applyAccessControlForCreate(list, context, rawData);
@@ -78,7 +79,10 @@ export class NestedMutationState {
   }
 
   async afterChange() {
-    await promiseAllRejectWithAllErrors(this.#afterChanges.map(async x => x()));
+    await promiseAllRejectWithExtensionError(
+      'afterChange',
+      this.#afterChanges.map(async x => x())
+    );
   }
 }
 
@@ -125,6 +129,7 @@ export async function createMany(
       writeLimit
     );
 
+    // Wraps any errors in a KS_HOOK_ERROR
     await afterChange(item);
 
     return item;
@@ -145,10 +150,30 @@ async function updateSingle(
   }
 
   const { where: uniqueInput, data: rawData } = updateInput;
+  // Check for bad user input
+  // e.g. connect/create statements are valid,
+  // ID fields are well formed?
+  // Timestamps are interpretable?
+  // JSON is well formed?
+
   // Validate and resolve the input filter
   const uniqueWhere = await resolveUniqueWhereInput(uniqueInput, list.fields, context);
 
-  // Filter and Item access control. Will throw an accessDeniedError if not allowed.
+  // Validate form of input data
+  // call field.validateOriginalInput.
+  // For a relationship field, this will be a recursive call?
+  // Yeah, probably, we want to error early
+
+  // Can we hoist this stuff all the way out of this loop
+  // so that the updateMany operation itself fails, rather than
+  // individual items? I feel like this would be a better
+  // outcome, since a UserInputError is a effectively equivalent
+  // to a syntax or schema error.
+  //
+  // In that case we want to traverse the entire input
+  // and collect all the different places that something could have gone wrong.
+
+  // Apply access control
   const existingItem = await getAccessControlledItemForUpdate(
     list,
     context,
@@ -164,10 +189,13 @@ async function updateSingle(
     existingItem
   );
 
+  // Need to check here for uniqueness and map that to a validation error.
   const updatedItem = await writeLimit(() =>
     runWithPrisma(context, list, model => model.update({ where: { id: existingItem.id }, data }))
   );
-
+  // Errors here should... hmm. I think we agreed that we would surface the error,
+  // but still return valid data? We need to add tests for this.
+  // Wraps any errors in a KS_HOOK_ERROR
   await afterChange(updatedItem);
 
   return updatedItem;
@@ -229,8 +257,10 @@ async function getResolvedData(
   // in a generic catch-all error handler.
   if (operation === 'create') {
     resolvedData = Object.fromEntries(
-      await promiseAllRejectWithAllErrors(
+      await promiseAllRejectWithExtensionError(
+        `defaultValue`,
         Object.entries(list.fields).map(async ([fieldKey, field]) => {
+          // input may be undefined here if they didn't specify a value
           let input = resolvedData[fieldKey];
           if (input === undefined && field.__legacy?.defaultValue !== undefined) {
             input =
@@ -245,40 +275,57 @@ async function getResolvedData(
   }
 
   // Apply non-relationship field type input resolvers
+  // NOTE: These resolvers can have side effects, such as saving files to the disk, or uploading images to the cloud.
   resolvedData = Object.fromEntries(
-    await promiseAllRejectWithAllErrors(
+    await promiseAllRejectWithSystemError(
       Object.entries(list.fields).map(async ([fieldKey, field]) => {
         const inputResolver = field.input?.[operation]?.resolve;
+        // input may be undefined here if they didn't specify a value
+        // and no default was applied
         let input = resolvedData[fieldKey];
+        // Resolve field type input resolvers
         if (inputResolver && field.dbField.kind !== 'relation') {
           input = await inputResolver(input, context, undefined);
         }
+        // input can still be undefined here if no-one set a value
         return [fieldKey, input] as const;
       })
     )
   );
 
   // Apply relationship field type input resolvers
+  // NOTE: These resolvers can have side effects, such as creating nested items
   resolvedData = Object.fromEntries(
-    await promiseAllRejectWithAllErrors(
+    await promiseAllRejectWithRelationshipError(
       Object.entries(list.fields).map(async ([fieldKey, field]) => {
         const inputResolver = field.input?.[operation]?.resolve;
+        // input may be undefined here if they didn't specify a value
+        // and no default was applied
         let input = resolvedData[fieldKey];
+
+        // Resolve field type input resolvers
+        // If we have a *create* we can end up
+        // with any kind of error.
+        // If we have a *connect* we can end up with
+        // access control errors...? Need to assess what these might be
         if (inputResolver && field.dbField.kind === 'relation') {
           input = await inputResolver(
             input,
             context,
             // This third argument only applies to relationship fields
             (() => {
+              // Resolve relationships
               if (input === undefined) {
                 // No-op: This is what we want
                 return () => undefined;
               }
               if (input === null) {
-                // No-op: Should this be UserInputError?
                 return () => undefined;
+                // return () => {
+                //   throw new userInputError("Relationship fields can't be null");
+                // };
               }
-              const target = `${list.listKey}.${fieldKey}<${field.dbField.list}>`;
+              const target = `${list.listKey}.${fieldKey}`;
               const foreignList = list.lists[field.dbField.list];
               let resolver;
               if (field.dbField.mode === 'many') {
@@ -298,6 +345,7 @@ async function getResolvedData(
             })()
           );
         }
+        // input can still be undefined here if no-one set a value
         return [fieldKey, input] as const;
       })
     )
@@ -360,12 +408,14 @@ async function resolveInputForCreateOrUpdate(
 
   // Take the original input and resolve all the fields down to what
   // will be saved into the database.
+  // Can throw KS_MUTATION_ERROR
   hookArgs.resolvedData = await getResolvedData(list, hookArgs, nestedMutationState);
 
   // Apply all validation checks
   await validateUpdateCreate({ list, hookArgs });
 
   // Run beforeChange hooks
+  // Wraps any errors in a KS_HOOK_ERROR
   await runSideEffectOnlyHook(list, 'beforeChange', hookArgs);
 
   // Return the full resolved input (ready for prisma level operation),
@@ -373,8 +423,10 @@ async function resolveInputForCreateOrUpdate(
   return {
     data: flattenMultiDbFields(list.fields, hookArgs.resolvedData),
     afterChange: async (updatedItem: ItemRootValue) => {
+      // Wraps any errors in a KS_HOOK_ERROR
       await nestedMutationState.afterChange();
-      await runSideEffectOnlyHook(list, 'afterChange', { ...hookArgs, updatedItem, existingItem });
+      // Wraps any errors in a KS_HOOK_ERROR
+      await runSideEffectOnlyHook(list, 'afterChange', { ...hookArgs, updatedItem });
     },
   };
 }

@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import { Upload } from 'graphql-upload';
 import mime from 'mime';
 import { file } from '..';
+import { expectSystemError } from '../../../../../../tests/api-tests/utils';
 
 const prepareFile = (_filePath: string) => {
   const filePath = path.resolve(`${__dirname}/../test-files/${_filePath}`);
@@ -139,8 +140,12 @@ export const crudTests = (keystoneTestWrapper: any) => {
           variables: { item: { secretFile: { ref: 'Invalid ref!' } } },
         });
         expect(data).toEqual({ createTest: null });
-        expect(errors).toHaveLength(1);
-        expect(errors![0].message).toEqual('Invalid file reference');
+        expectSystemError(errors, [
+          {
+            path: ['createTest'],
+            messages: ['Invalid file reference'],
+          },
+        ]);
       })
     );
     test(
@@ -159,8 +164,12 @@ export const crudTests = (keystoneTestWrapper: any) => {
           variables: { item: { secretFile: { ref: null } } },
         });
         expect(data).toEqual({ createTest: null });
-        expect(errors).toHaveLength(1);
-        expect(errors![0].message).toEqual('Either ref or upload must be passed to FileFieldInput');
+        expectSystemError(errors, [
+          {
+            path: ['createTest'],
+            messages: [`Cannot read property 'createReadStream' of undefined`],
+          },
+        ]);
       })
     );
     test(
@@ -189,10 +198,12 @@ export const crudTests = (keystoneTestWrapper: any) => {
           },
         });
         expect(data).toEqual({ createTest: null });
-        expect(errors).toHaveLength(1);
-        expect(errors![0].message).toEqual(
-          'Only one of ref and upload can be passed to FileFieldInput'
-        );
+        expectSystemError(errors, [
+          {
+            path: ['createTest'],
+            messages: ['Only one of ref and upload can be passed to FileFieldInput'],
+          },
+        ]);
       })
     );
     test(
@@ -213,10 +224,12 @@ export const crudTests = (keystoneTestWrapper: any) => {
           },
         });
         expect(data).toEqual({ createTest: null });
-        expect(errors).toHaveLength(1);
-        expect(errors![0].message).toEqual(
-          'Only one of ref and upload can be passed to FileFieldInput'
-        );
+        expectSystemError(errors, [
+          {
+            path: ['createTest'],
+            messages: ['Invalid file reference'],
+          },
+        ]);
       })
     );
   });

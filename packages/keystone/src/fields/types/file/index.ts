@@ -9,6 +9,9 @@ import {
   FileData,
   FieldDefaultValue,
 } from '../../../types';
+import { getFileRef } from '@keystone-next/utils';
+import { FileUpload } from 'graphql-upload';
+import { userInputError } from '../../../../keystone/src/lib/core/graphql-errors';
 import { resolveView } from '../../resolve-view';
 import { getFileRef } from './utils';
 
@@ -65,22 +68,35 @@ const LocalFileFieldOutput = graphql.object<FileData>()({
   fields: fileFields,
 });
 
+async function validateInput(args: any) {
+  const { originalInput, fieldPath } = args;
+  const data = originalInput[fieldPath];
+  if (data === null || data === undefined) {
+    return;
+  }
+
+  if (data.ref) {
+    if (data.upload) {
+      throw userInputError('Only one of ref and upload can be passed to FileFieldInput');
+    }
+    return;
+  } else if (!data.upload) {
+    throw userInputError('Either ref or upload must be passed to FileFieldInput');
+  }
+  return;
+}
+
 async function inputResolver(data: FileFieldInputType, context: KeystoneContext) {
   if (data === null || data === undefined) {
     return { mode: data, filename: data, filesize: data };
   }
 
   if (data.ref) {
-    if (data.upload) {
-      throw new Error('Only one of ref and upload can be passed to FileFieldInput');
-    }
     return context.files!.getDataFromRef(data.ref);
+  } else {
+    const upload = await data.upload;
+    return context.files!.getDataFromStream(upload!.createReadStream(), upload!.filename);
   }
-  if (!data.upload) {
-    throw new Error('Either ref or upload must be passed to FileFieldInput');
-  }
-  const upload = await data.upload;
-  return context.files!.getDataFromStream(upload.createReadStream(), upload.filename);
 }
 
 export const file =
@@ -104,8 +120,16 @@ export const file =
     })({
       ...config,
       input: {
-        create: { arg: graphql.arg({ type: FileFieldInput }), resolve: inputResolver },
-        update: { arg: graphql.arg({ type: FileFieldInput }), resolve: inputResolver },
+        create: {
+          arg: graphql.arg({ type: FileFieldInput }),
+          resolve: inputResolver,
+          validate: validateInput,
+        },
+        update: {
+          arg: graphql.arg({ type: FileFieldInput }),
+          resolve: inputResolver,
+          validate: validateInput,
+        },
       },
       output: graphql.field({
         type: FileFieldOutput,

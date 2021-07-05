@@ -22,7 +22,9 @@ async function getFilteredItem(
   if (typeof accessFilters === 'object') {
     where = { AND: [where, await resolveWhereInput(accessFilters, list, context)] };
   }
-  const item = await runWithPrisma(context, list, model => model.findFirst({ where }));
+  const item = await runWithPrisma(context, list, model =>
+    model.findFirst({ where: uniqueWhereInWhereForm })
+  );
   if (item === null) {
     throw accessDeniedError();
   }
