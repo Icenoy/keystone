@@ -1,13 +1,8 @@
 ---
-'@keystone-ui/website': patch
+'@keystone-next/keystone': major
 '@keystone-next/website': patch
-'@keystone-next/example-assets-cloud': patch
-'@keystone-next/example-assets-local': patch
-'@keystone-next/example-auth': patch
 '@keystone-next/examples-app-basic': patch
-'@keystone-next/example-ecommerce': patch
-'@keystone-next/example-embedded-nextjs': patch
-'@keystone-next/example-roles': patch
+'keystone-next-app': patch
 '@keystone-next/example-blog': patch
 '@keystone-next/example-custom-admin-ui-logo': patch
 '@keystone-next/example-custom-admin-ui-navigation': patch
@@ -22,12 +17,13 @@
 '@keystone-next/example-testing': patch
 '@keystone-next/example-virtual-field': patch
 '@keystone-next/example-with-auth': patch
-'@keystone-next/auth': patch
-'@keystone-next/fields-document': patch
-'@keystone-next/keystone': patch
 '@keystone-next/api-tests-legacy': patch
-'@keystone-next/test-projects-basic': patch
-'@keystone-next/test-projects-crud-notifications': patch
 ---
 
-Updated `typescript` dependency to `^4.4.2`.
+Upgraded Apollo Server to [Version 3](https://www.apollographql.com/docs/apollo-server/migration/).
+
+The Apollo documentation contains a full list of breaking changes introduced by this update.
+You can configure the Apollo Server provided by Keystone using the [`graphql.apolloConfig`](https://keystonejs.com/docs/apis/config#graphql) configuration option.
+
+The most prominant change for most users will be that the GraphQL Playground has been replaced by the Apollo Sandbox.
+If you prefer to keep the GraphQL Playground, you can configure your server by [following these instructions](https://www.apollographql.com/docs/apollo-server/migration/#graphql-playground).
